@@ -58,15 +58,19 @@ def validate_and_process_data(df: pd.DataFrame, tickers: list) -> pd.DataFrame:
         # 2. Check for missing values (NaN)
         missing_counts = ticker_df.isna().sum()
         if missing_counts.any():
-            print(f"[{ticker}] Missing values found: {missing_counts.to_dict()}")
-            # Forward fill is standard for missing trading days/price gaps
-            ticker_df = ticker_df.ffill()
+            print(f"[{ticker}] Missing values found:")
+            print(missing_counts[missing_counts > 0])
+            
+            # Do not automatically forward-fill OHLCV data.
+            # Remove incomplete observations and inspect data quality.
+            ticker_df = ticker_df.dropna(
+                subset=['Open', 'High', 'Low', 'Close', 'Adj Close', 'Volume']
+            )
             
         # 3. Drop any leading NaNs (before the first valid data point)
         ticker_df = ticker_df.dropna()
         
         # 4. Calculate Daily Returns using Adjusted Close
-        # Formula: (P_t / P_{t-1}) - 1
         ticker_df['Daily_Return'] = ticker_df['Adj Close'].pct_change()
         
         # Drop the first row since Daily_Return will be NaN

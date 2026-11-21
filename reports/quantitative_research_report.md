@@ -5,9 +5,7 @@
 ## 1. Executive Summary
 This project investigated whether historical market information reveals statistically meaningful patterns in future financial market behaviour, and whether those patterns survive on unseen data. We tested six experiments across a 2015–2024 dataset of SPY, QQQ, IWM, TLT, and GLD. 
 
-Our findings confirmed that while daily returns are largely unpredictable (Experiment C), volatility exhibits strong clustering (Experiment A). By exploiting this clustering (Experiment B), we built a strategy that successfully improved risk-adjusted returns and drastically reduced drawdown durations out-of-sample (Experiments E & F).
-
-The results indicate that daily returns exhibit limited linear predictability in the tested experiments, while volatility demonstrates statistically significant clustering. The EWMA volatility model provided useful out-of-sample volatility estimates. A volatility-filtered SPY strategy also showed improved historical risk-adjusted performance and lower maximum drawdown than Buy & Hold during the selected 2022–2024 test period. These findings are specific to the tested assets, sample and execution assumptions and require further validation.
+Our findings indicate that daily returns exhibit limited out-of-sample predictability in the tested experiments, while volatility demonstrates statistically significant clustering. The EWMA volatility model provided useful out-of-sample volatility estimates. A volatility-filtered SPY strategy also demonstrated improved historical risk-adjusted performance and lower maximum drawdown relative to Buy & Hold during the selected 2022–2024 test period. These findings are specific to the tested assets, sample and execution assumptions and require further validation.
 
 ## 2. Dataset & Methodology
 - **Data:** Daily OHLCV and Adjusted Close for 5 liquid ETFs (SPY, QQQ, IWM, TLT, GLD) spanning 2015–2024.
