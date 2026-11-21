@@ -2,10 +2,7 @@ import pandas as pd
 import numpy as np
 
 def generate_ewma_strategy(df: pd.DataFrame, alpha: float = 0.06, window: int = 50, tc: float = 0.0001) -> pd.DataFrame:
-    """
-    Generates the EWMA volatility-targeting strategy.
-    Handles signal generation, position shifting, and transaction costs consistently.
-    """
+    """Generates the EWMA volatility-targeting strategy."""
     df = df.copy()
     
     # 1. EWMA Volatility
@@ -33,41 +30,51 @@ def analyze_drawdown_metrics(cumulative_returns: pd.Series, label: str):
     rolling_max = cumulative_returns.cummax()
     drawdown = (cumulative_returns / rolling_max) - 1
     
-    # Isolate drawdown episodes
+    # Identify when we hit a new high water mark
+    is_new_high = cumulative_returns == rolling_max
+    high_water_dates = cumulative_returns[is_new_high].index
+    
     is_underwater = drawdown < 0
     underwater_groups = (is_underwater != is_underwater.shift()).cumsum()
     
     results = []
     
-    # Iterate through each drawdown group
     for group_id, group_data in drawdown.groupby(underwater_groups):
         if not (group_data < 0).any():
-            continue # Skip groups where we aren't underwater
+            continue
             
-        peak_date = group_data.index[0] - pd.Timedelta(days=1) # Approx date of previous peak
+        # The start of this underwater period
+        underwater_start_date = group_data.index[0]
+        
+        # Find the actual Peak Date: the most recent High Water Mark BEFORE this period
+        prior_highs = high_water_dates[high_water_dates < underwater_start_date]
+        peak_date = prior_highs[-1] if len(prior_highs) > 0 else underwater_start_date
+        
         trough_date = group_data.idxmin()
         max_depth = group_data.min()
         
         # Find recovery date (if any)
-        recovery_date = None
         post_drawdown = drawdown.loc[trough_date:]
         recovered_days = post_drawdown[post_drawdown >= 0]
         
         if len(recovered_days) > 0:
             recovery_date = recovered_days.index[0]
             total_underwater = (recovery_date - peak_date).days
+            recovery_duration = (recovery_date - trough_date).days
         else:
             recovery_date = None
             total_underwater = np.nan # Right-censored
+            recovery_duration = np.nan
             
         time_to_trough = (trough_date - peak_date).days
         
         results.append({
+            'peak_date': peak_date,
+            'trough_date': trough_date,
             'max_depth': max_depth,
             'time_to_trough': time_to_trough,
-            'recovery_date': recovery_date,
+            'recovery_duration': recovery_duration,
             'total_underwater': total_underwater,
-            'trough_date': trough_date,
             'is_recovered': recovery_date is not None
         })
         
@@ -80,18 +87,18 @@ def analyze_drawdown_metrics(cumulative_returns: pd.Series, label: str):
         
     deepest = df_results.loc[df_results['max_depth'].idxmin()]
     print(f"Deepest Drawdown: {deepest['max_depth']*100:.2f}%")
-    print(f"Time to Trough:   {deepest['time_to_trough']} days")
+    print(f"  Time to Trough:    {deepest['time_to_trough']} calendar days")
     
     if deepest['is_recovered']:
-        print(f"Recovery Duration:{deepest['total_underwater'] - deepest['time_to_trough']} days")
-        print(f"Total Underwater: {deepest['total_underwater']} days (Peak to Recovery)")
+        print(f"  Recovery Duration: {deepest['recovery_duration']} calendar days")
+        print(f"  Total Underwater:  {deepest['total_underwater']} calendar days")
     else:
-        print(f"Status:           UNRECOVERED at end of sample.")
+        print(f"  Status:            UNRECOVERED at end of sample.")
         
     longest = df_results.dropna(subset=['total_underwater'])
     if not longest.empty:
         max_duration = longest['total_underwater'].max()
-        print(f"Longest Underwater Period: {max_duration} days")
+        print(f"Longest Completed Underwater Period: {max_duration} calendar days")
     print("\n")
     
     return df_results
