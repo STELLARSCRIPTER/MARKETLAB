@@ -58,11 +58,8 @@ def analyze_drawdown_metrics(cumulative_returns: pd.Series, label: str):
         
         # Find recovery date WITHIN this specific episode (or right-censored if open)
         post_trough = drawdown.loc[trough_date:]
-        # Find the first time we get back to 0 (or above) AFTER the trough
         recovery_series = post_trough[post_trough >= 0]
         
-        # Check if the recovery happened before the next underwater episode started
-        # (i.e., did the episode actually end?)
         episode_end_date = group_data.index[-1]
         next_day_idx = drawdown.index.get_loc(episode_end_date)
         
@@ -114,7 +111,7 @@ def analyze_drawdown_metrics(cumulative_returns: pd.Series, label: str):
     longest = df_results.dropna(subset=['total_underwater'])
     if not longest.empty:
         max_duration = longest['total_underwater'].max()
-        print(f"Longest Completed Underwater Period: {max_duration} calendar days")
+        print(f"Longest Underwater Period: {max_duration} days")
     print("\n")
     
     return df_results
