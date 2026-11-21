@@ -24,9 +24,9 @@ def test_autocorrelation(returns: pd.Series, lags: int = 10) -> dict:
     }
 
 def test_arch_effects(returns: pd.Series, lags: int = 5) -> dict:
-    """Runs ARCH LM test for volatility clustering."""
-    squared_returns = returns ** 2
-    arch_test = het_arch(squared_returns, nlags=lags)
+    """Runs ARCH LM test for volatility clustering. Pass RAW returns, NOT squared returns."""
+    # het_arch expects the raw series; it squares them internally
+    arch_test = het_arch(returns, nlags=lags)
     return {
         "lm_stat": arch_test[0], 
         "p_value": arch_test[1]
