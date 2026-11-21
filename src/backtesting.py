@@ -25,14 +25,13 @@ def generate_ewma_strategy(df: pd.DataFrame, alpha: float = 0.06, window: int = 
 
 def analyze_drawdown_metrics(cumulative_returns: pd.Series, label: str):
     """
-    Calculates rigorous drawdown metrics: Depth, Time to Trough, Recovery Duration, Total Underwater.
+    Calculates drawdown metrics: depth, time to trough, recovery duration and total
+    underwater duration. Durations are measured in calendar days.
+    Unrecovered drawdowns are treated as right-censored.
     """
+    cumulative_returns = cumulative_returns.dropna().sort_index().copy()
     rolling_max = cumulative_returns.cummax()
     drawdown = (cumulative_returns / rolling_max) - 1
-    
-    # Identify when we hit a new high water mark
-    is_new_high = cumulative_returns == rolling_max
-    high_water_dates = cumulative_returns[is_new_high].index
     
     is_underwater = drawdown < 0
     underwater_groups = (is_underwater != is_underwater.shift()).cumsum()
@@ -43,27 +42,44 @@ def analyze_drawdown_metrics(cumulative_returns: pd.Series, label: str):
         if not (group_data < 0).any():
             continue
             
-        # The start of this underwater period
         underwater_start_date = group_data.index[0]
+        underwater_end_date = group_data.index[-1]
         
-        # Find the actual Peak Date: the most recent High Water Mark BEFORE this period
-        prior_highs = high_water_dates[high_water_dates < underwater_start_date]
-        peak_date = prior_highs[-1] if len(prior_highs) > 0 else underwater_start_date
+        # Find the most recent high-water mark before this episode
+        prior_highs = cumulative_returns.loc[cumulative_returns.index < underwater_start_date]
+        if prior_highs.empty:
+            continue
+            
+        peak_value = prior_highs.max()
+        peak_date = prior_highs[prior_highs == peak_value].index[-1]
         
         trough_date = group_data.idxmin()
         max_depth = group_data.min()
         
-        # Find recovery date (if any)
-        post_drawdown = drawdown.loc[trough_date:]
-        recovered_days = post_drawdown[post_drawdown >= 0]
+        # Find recovery date WITHIN this specific episode (or right-censored if open)
+        post_trough = drawdown.loc[trough_date:]
+        # Find the first time we get back to 0 (or above) AFTER the trough
+        recovery_series = post_trough[post_trough >= 0]
         
-        if len(recovered_days) > 0:
-            recovery_date = recovered_days.index[0]
+        # Check if the recovery happened before the next underwater episode started
+        # (i.e., did the episode actually end?)
+        episode_end_date = group_data.index[-1]
+        next_day_idx = drawdown.index.get_loc(episode_end_date)
+        
+        if next_day_idx + 1 < len(drawdown):
+            next_day_date = drawdown.index[next_day_idx + 1]
+            if len(recovery_series) > 0 and recovery_series.index[0] == next_day_date:
+                recovery_date = next_day_date
+            else:
+                recovery_date = None
+        else:
+            recovery_date = None
+            
+        if recovery_date is not None:
             total_underwater = (recovery_date - peak_date).days
             recovery_duration = (recovery_date - trough_date).days
         else:
-            recovery_date = None
-            total_underwater = np.nan # Right-censored
+            total_underwater = np.nan
             recovery_duration = np.nan
             
         time_to_trough = (trough_date - peak_date).days
